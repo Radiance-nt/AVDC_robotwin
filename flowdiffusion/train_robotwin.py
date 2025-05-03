@@ -28,7 +28,7 @@ def generate_long_sequence(trainer, initial_frame, text, total_steps, sample_per
 def main(args):
     valid_n = 1
     sample_per_seq = 8
-    validation_sample_per_seq = args.generate_frames + 1
+    sample_per_seq_for_sampling = args.generate_frames + 1
     target_size = (128, 128)
     temp_dataset = SequentialDatasetRoboTwin(
         sample_per_seq=sample_per_seq,
@@ -56,7 +56,14 @@ def main(args):
         indices=train_indices
     )
     valid_set = SequentialDatasetRoboTwin(
-        sample_per_seq=validation_sample_per_seq,
+        sample_per_seq=sample_per_seq,
+        path="../datasets/robotwin",
+        target_size=target_size,
+        randomcrop=False,
+        indices=val_indices
+    )
+    valid_set_for_sampling = SequentialDatasetRoboTwin(
+        sample_per_seq=sample_per_seq_for_sampling,
         path="../datasets/robotwin",
         target_size=target_size,
         randomcrop=False,
@@ -104,8 +111,8 @@ def main(args):
     if args.mode == 'train':
         trainer.train()
     device = trainer.device
-    for idx in range(len(valid_set)):
-        x_future, x_cond, task = valid_set[idx]
+    for idx in range(len(valid_set_for_sampling)):
+        x_future, x_cond, task = valid_set_for_sampling[idx]
         x_future, x_cond = x_future.to(device), x_cond.to(device)
         full_sequence = torch.cat((x_cond, x_future), dim=0).reshape(-1, 3, *target_size)
 
