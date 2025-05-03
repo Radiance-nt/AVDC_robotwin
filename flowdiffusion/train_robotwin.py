@@ -1,9 +1,13 @@
 from goal_diffusion import GoalGaussianDiffusion, Trainer
 from unet import UnetMW as Unet
 from transformers import CLIPTextModel, CLIPTokenizer
-from datasets import SequentialDatasetv2
+from datasets import SequentialDatasetRoboTwin
 from torch.utils.data import Subset
 import argparse
+import os
+import huggingface_hub
+
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 
 def main(args):
@@ -14,11 +18,11 @@ def main(args):
     if args.mode == 'inference':
         train_set = valid_set = [None]  # dummy
     else:
-        train_set = SequentialDatasetv2(
+        train_set = SequentialDatasetRoboTwin(
             sample_per_seq=sample_per_seq,
-            path="../datasets/metaworld",
+            path="../datasets/robotwin",
             target_size=target_size,
-            randomcrop=True
+            randomcrop=False
         )
         valid_inds = [i for i in range(0, len(train_set), len(train_set) // valid_n)][:valid_n]
         valid_set = Subset(train_set, valid_inds)
@@ -58,7 +62,7 @@ def main(args):
         valid_batch_size=32,
         gradient_accumulate_every=1,
         num_samples=valid_n,
-        results_folder='../results/mw',
+        results_folder='../results/robotwin',
         fp16=True,
         amp=True,
     )
