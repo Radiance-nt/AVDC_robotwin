@@ -11,6 +11,7 @@ import torchvision.transforms as T
 import random
 from torchvideotransforms import video_transforms, volume_transforms
 from einops import rearrange
+import pickle
 # from vidaug import augmentors as va
 
 random.seed(0)
@@ -427,9 +428,135 @@ class MySeqDatasetReal(SequentialDataset):
         print("Done")
 
 
+class SequentialDatasetRoboTwin(Dataset):
+    def __init__(self, path="../datasets/robotwin", sample_per_seq=7,
+                 target_size=(128, 128), frameskip=None, randomcrop=False,
+                 camera_name='head_camera'):
+        """
+        Custom dataset loader for RoboTwin sequential data.
+
+        Args:
+            path (str): Root directory containing the dataset
+            sample_per_seq (int): Number of frames to sample per sequence
+            target_size (tuple): Output image resolution (height, width)
+            frameskip (int/None): Frame interval for sampling (None for uniform sampling)
+            randomcrop (bool): Whether to apply random cropping
+            camera_name (str): Camera to use ('head_camera', 'left_camera', 'right_camera')
+        """
+        self.sample_per_seq = sample_per_seq
+        self.target_size = target_size
+        self.frameskip = frameskip
+        self.camera_name = camera_name
+
+        # Scan for all episode paths (robotwin/{task}_D435_pkl/episode_<i>)
+        self.episode_paths = []
+        self.tasks = []
+        for task_dir in glob(os.path.join(path, "*_D435_pkl")):
+            # Extract task name from directory name
+            task_name = os.path.basename(task_dir).replace("_D435_pkl", "").replace("_", " ")
+            for episode_path in glob(os.path.join(task_dir, "episode*")):
+                self.episode_paths.append(episode_path)
+                self.tasks.append(task_name)
+
+        # Setup image transformations
+        if randomcrop:
+            self.transform = T.Compose([
+                T.CenterCrop((160, 160)),  # First center crop
+                T.RandomCrop(target_size),  # Then random crop
+                T.ToTensor()  # Convert to tensor and normalize
+            ])
+        else:
+            self.transform = T.Compose([
+                T.Resize(target_size),  # Simple resize
+                T.ToTensor()  # Convert to tensor and normalize
+            ])
+
+        # Pre-validate episodes to ensure they have enough frames
+        self.valid_episodes = []
+        for ep_path in self.episode_paths:
+            # Sort frame files numerically (assuming filenames are numbers)
+            frame_files = sorted(glob(os.path.join(ep_path, "*.pkl")),
+                                 key=lambda x: int(os.path.basename(x).split('.')[0]))
+            if len(frame_files) >= sample_per_seq:
+                self.valid_episodes.append(frame_files)
+
+        print(f"Found {len(self.valid_episodes)} valid episodes (≥{sample_per_seq} frames)")
+
+    def __len__(self):
+        """Returns total number of valid episodes"""
+        return len(self.valid_episodes)
+
+    def get_samples(self, idx):
+        """
+        Sample frame paths based on frameskip policy
+
+        Args:
+            idx (int): Episode index to sample from
+
+        Returns:
+            list: Paths to sampled frames
+        """
+        frame_files = self.valid_episodes[idx]
+
+        if self.frameskip is None:
+            # Uniform sampling across entire sequence
+            N = len(frame_files)
+            indices = [int(i * (N - 1) / (self.sample_per_seq - 1))
+                       for i in range(self.sample_per_seq)]
+        else:
+            # Fixed interval sampling from random start point
+            start_idx = random.randint(0, len(frame_files) - 1)
+            indices = range(start_idx,
+                            start_idx + self.frameskip * self.sample_per_seq,
+                            self.frameskip)
+            # Handle potential out-of-bounds indices
+            indices = [i if i < len(frame_files) else -1 for i in indices]
+
+        return [frame_files[i] for i in indices]
+
+    def load_pkl_frame(self, pkl_path):
+        """
+        Load RGB image from .pkl file for specified camera
+
+        Args:
+            pkl_path (str): Path to .pkl file
+
+        Returns:
+            PIL.Image: RGB image from specified camera
+        """
+        with open(pkl_path, 'rb') as f:
+            data = pickle.load(f)
+        # Extract RGB array from nested structure
+        rgb_array = data['observation'][self.camera_name]['rgb']  # shape: (H, W, 3)
+        return Image.fromarray(rgb_array)
+
+    def __getitem__(self, idx):
+        """
+        Get a single training sample
+
+        Returns:
+            tuple: (x, x_cond, task) where:
+                - x: Future frames concatenated [3*(T-1), H, W]
+                - x_cond: First frame [3, H, W]
+                - task: Task name string
+        """
+        # Get paths to sampled frames
+        sample_paths = self.get_samples(idx)
+
+        # Load and transform all frames
+        images = [self.transform(self.load_pkl_frame(p)) for p in sample_paths]
+
+        # Split into conditioning (first) and future frames
+        x_cond = images[0]  # First frame [3, H, W]
+        x = torch.cat(images[1:], dim=0)  # Future frames [3*(T-1), H, W]
+        task = self.tasks[idx]  # Task name
+
+        return x, x_cond, task
+
+
 if __name__ == "__main__":
-    dataset = SequentialNavDataset("../datasets/thor")
-    x, x_cond, task = dataset[2]
+    dataset = SequentialDatasetRoboTwin("../datasets/robotwin")
+    x, x_cond, task = dataset[1]
     print(x.shape)
     print(x_cond.shape)
     print(task)
