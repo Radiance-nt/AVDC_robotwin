@@ -8,7 +8,7 @@ import argparse
 import os
 import torch
 import imageio
-from tqdm import tqdm
+from datetime import datetime
 import wandb
 
 
@@ -26,6 +26,8 @@ def generate_long_sequence(trainer, initial_frame, text, total_steps, sample_per
 
 
 def main(args):
+    run_name = wandb.run.name if wandb.run is not None else datetime.now().strftime("%Y%m%d_%H%M%S")
+
     valid_n = 1
     sample_per_seq = 8
     sample_per_seq_for_sampling = args.generate_frames + 1
@@ -105,6 +107,7 @@ def main(args):
         fp16=True,
         amp=True,
         wandb=args.use_wandb,
+        run_name=run_name,
     )
     if args.checkpoint_num is not None:
         trainer.load(args.checkpoint_num)
@@ -143,7 +146,10 @@ def main(args):
             wandb.log({'inference_avg_psnr': avg_psnr, 'inference_avg_ssim': avg_ssim})
         frames_np = frames.cpu().numpy().transpose(0, 2, 3, 1)
         frames_np = (frames_np.clip(0, 1) * 255).astype('uint8')
-        output_path = f"../results/robotwin/{task}_{episode_name}_steps_{total_steps}.gif"
+
+        folder_path = f'../results/robotwin/final_generation_{run_name}/'
+        os.makedirs(folder_path, exist_ok=True)
+        output_path = os.path.join(folder_path, f"{task}_{episode_name}_steps_{total_steps}.gif")
         imageio.mimsave(output_path, frames_np, duration=200, loop=1000)
         print(f"Saved generated sequence to {output_path}")
 

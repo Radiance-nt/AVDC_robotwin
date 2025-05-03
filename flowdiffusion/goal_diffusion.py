@@ -596,7 +596,8 @@ class Trainer(object):
         calculate_fid = True,
         inception_block_idx = 2048,
         cond_drop_chance=0.1,
-        wandb=None
+        wandb=None,
+        run_name="",
     ):
         super().__init__()
         self.wandb = wandb
@@ -638,6 +639,8 @@ class Trainer(object):
             self.ema.to(self.device)
         self.results_folder = Path(results_folder)
         self.results_folder.mkdir(exist_ok = True, parents = True)
+        self.output_folder = Path(os.path.join(self.results_folder, run_name))
+        self.output_folder.mkdir(exist_ok = True, parents = True)
         self.step = 0
         self.model, self.opt, self.text_encoder = self.accelerator.prepare(self.model, self.opt, self.text_encoder)
 
@@ -756,14 +759,14 @@ class Trainer(object):
                                 'val_avg_ssim': avg_ssim,
                             })
                         if self.step == self.save_and_sample_every:
-                            os.makedirs(str(self.results_folder / f'imgs'), exist_ok = True)
+                            os.makedirs(str(self.output_folder / f'imgs'), exist_ok = True)
                             gt_img = torch.cat([gt_first, gt_last, gt_xs], dim=1)
                             gt_img = rearrange(gt_img, 'b n c h w -> (b n) c h w', n=n_rows+2)
-                            utils.save_image(gt_img, str(self.results_folder / f'imgs/gt_img.png'), nrow=n_rows+2)
-                        os.makedirs(str(self.results_folder / f'imgs/outputs'), exist_ok = True)
+                            utils.save_image(gt_img, str(self.output_folder / f'imgs/gt_img.png'), nrow=n_rows+2)
+                        os.makedirs(str(self.output_folder / f'imgs/outputs'), exist_ok = True)
                         pred_img = torch.cat([gt_first, gt_last, all_xs], dim=1)
                         pred_img = rearrange(pred_img, 'b n c h w -> (b n) c h w', n=n_rows+2)
-                        utils.save_image(pred_img, str(self.results_folder / f'imgs/outputs/sample-{milestone}.png'), nrow=n_rows+2)
+                        utils.save_image(pred_img, str(self.output_folder / f'imgs/outputs/sample-{milestone}.png'), nrow=n_rows+2)
                         self.save(milestone)
                 pbar.update(1)
         accelerator.print('training complete')
