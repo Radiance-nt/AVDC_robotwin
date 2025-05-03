@@ -706,8 +706,8 @@ class Trainer(object):
                 self.opt.step()
                 self.opt.zero_grad()
                 accelerator.wait_for_everyone()
-                if self.wandb is not None:
-                    self.wandb.log({
+                if self.wandb:
+                    wandb.log({
                         'train_loss': total_loss,
                         'learning_rate': self.opt.param_groups[0]['lr'],
                         'step': self.step
@@ -750,8 +750,8 @@ class Trainer(object):
                         avg_psnr = sum(psnr_values) / len(psnr_values)
                         avg_ssim = sum(ssim_values) / len(ssim_values)
                         print(f'Average PSNR: {avg_psnr:.4f}, Average SSIM: {avg_ssim:.4f}')
-                        if self.wandb is not None:
-                            self.wandb.log({
+                        if self.wandb:
+                            wandb.log({
                                 'val_avg_psnr': avg_psnr,
                                 'val_avg_ssim': avg_ssim,
                             })
