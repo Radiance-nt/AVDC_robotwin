@@ -628,10 +628,10 @@ class Trainer(object):
         valid_set = Subset(valid_set, valid_ind)
         self.ds = train_set
         self.valid_ds = valid_set
-        dl = DataLoader(self.ds, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = 4)
+        dl = DataLoader(self.ds, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = 8)
         dl = self.accelerator.prepare(dl)
         self.dl = cycle(dl)
-        self.valid_dl = DataLoader(self.valid_ds, batch_size = valid_batch_size, shuffle = False, pin_memory = True, num_workers = 4)
+        self.valid_dl = DataLoader(self.valid_ds, batch_size = valid_batch_size, shuffle = False, pin_memory = True, num_workers = 8)
         self.opt = Adam(diffusion_model.parameters(), lr = train_lr, betas = adam_betas)
         if self.accelerator.is_main_process:
             self.ema = EMA(diffusion_model, beta = ema_decay, update_every = ema_update_every)

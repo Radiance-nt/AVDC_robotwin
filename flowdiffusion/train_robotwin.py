@@ -6,14 +6,10 @@ from datasets import SequentialDatasetRoboTwin
 from torch.utils.data import Subset
 import argparse
 import os
-import huggingface_hub
 import torch
 import imageio
 from tqdm import tqdm
-import numpy as np
 import wandb
-
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 
 def generate_long_sequence(trainer, initial_frame, text, total_steps, sample_per_seq, guidance_weight=0):
@@ -46,7 +42,7 @@ def main(args):
     train_size = int(train_ratio * len(total_indices))
     train_indices = total_indices[:train_size]
     val_indices = total_indices[train_size:]
-    if args.use_wandb is not None:
+    if args.use_wandb:
         wandb.config.update({
             "train_indices": train_indices,
             "val_indices": val_indices,
@@ -136,7 +132,7 @@ def main(args):
         avg_psnr = sum(psnr_values) / len(psnr_values)
         avg_ssim = sum(ssim_values) / len(ssim_values)
         print(f'Average PSNR for generated sequence: {avg_psnr:.4f}, Average SSIM: {avg_ssim:.4f}')
-        if args.use_wandb is not None:
+        if args.use_wandb:
             wandb.log({'inference_avg_psnr': avg_psnr, 'inference_avg_ssim': avg_ssim})
         frames_np = frames.cpu().numpy().transpose(0, 2, 3, 1)
         frames_np = (frames_np.clip(0, 1) * 255).astype('uint8')
