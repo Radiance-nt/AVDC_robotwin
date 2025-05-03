@@ -42,10 +42,16 @@ def main(args):
     )
     total_indices = list(range(len(temp_dataset)))
     random.shuffle(total_indices)
-    train_ratio = 0.8
+    train_ratio = 0.9
     train_size = int(train_ratio * len(total_indices))
     train_indices = total_indices[:train_size]
     val_indices = total_indices[train_size:]
+    if args.use_wandb is not None:
+        wandb.config.update({
+            "train_indices": train_indices,
+            "val_indices": val_indices,
+            "train_ratio": train_ratio
+        })
     train_set = SequentialDatasetRoboTwin(
         sample_per_seq=sample_per_seq,
         path="../datasets/robotwin",
@@ -95,6 +101,7 @@ def main(args):
         results_folder='../results/robotwin',
         fp16=True,
         amp=True,
+        wandb=args.use_wandb,
     )
     if args.checkpoint_num is not None:
         trainer.load(args.checkpoint_num)
@@ -129,7 +136,7 @@ def main(args):
         avg_psnr = sum(psnr_values) / len(psnr_values)
         avg_ssim = sum(ssim_values) / len(ssim_values)
         print(f'Average PSNR for generated sequence: {avg_psnr:.4f}, Average SSIM: {avg_ssim:.4f}')
-        if wandb.run is not None:
+        if args.use_wandb is not None:
             wandb.log({'inference_avg_psnr': avg_psnr, 'inference_avg_ssim': avg_ssim})
         frames_np = frames.cpu().numpy().transpose(0, 2, 3, 1)
         frames_np = (frames_np.clip(0, 1) * 255).astype('uint8')

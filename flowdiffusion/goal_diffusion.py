@@ -596,8 +596,10 @@ class Trainer(object):
         calculate_fid = True,
         inception_block_idx = 2048,
         cond_drop_chance=0.1,
+        wandb=None
     ):
         super().__init__()
+        self.wandb = wandb
         self.cond_drop_chance = cond_drop_chance
         self.tokenizer = tokenizer
         self.text_encoder = text_encoder
@@ -608,14 +610,12 @@ class Trainer(object):
         self.accelerator.native_amp = amp
         self.model = diffusion_model
         self.channels = channels
-
         self.inception_v3 = None
         if calculate_fid:
             assert inception_block_idx in InceptionV3.BLOCK_INDEX_BY_DIM
             block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[inception_block_idx]
             self.inception_v3 = InceptionV3([block_idx])
             self.inception_v3.to(self.device)
-
         self.num_samples = num_samples
         self.save_and_sample_every = save_and_sample_every
         self.batch_size = train_batch_size
@@ -623,7 +623,6 @@ class Trainer(object):
         self.gradient_accumulate_every = gradient_accumulate_every
         self.train_num_steps = train_num_steps
         self.image_size = diffusion_model.image_size
-
         valid_ind = [i for i in range(len(valid_set))][:num_samples]
         train_set = train_set
         valid_set = Subset(valid_set, valid_ind)
@@ -633,7 +632,6 @@ class Trainer(object):
         dl = self.accelerator.prepare(dl)
         self.dl = cycle(dl)
         self.valid_dl = DataLoader(self.valid_ds, batch_size = valid_batch_size, shuffle = False, pin_memory = True, num_workers = 4)
-
         self.opt = Adam(diffusion_model.parameters(), lr = train_lr, betas = adam_betas)
         if self.accelerator.is_main_process:
             self.ema = EMA(diffusion_model, beta = ema_decay, update_every = ema_update_every)
@@ -708,6 +706,12 @@ class Trainer(object):
                 self.opt.step()
                 self.opt.zero_grad()
                 accelerator.wait_for_everyone()
+                if self.wandb is not None:
+                    self.wandb.log({
+                        'train_loss': total_loss,
+                        'learning_rate': self.opt.param_groups[0]['lr'],
+                        'step': self.step
+                    })
                 self.step += 1
                 if accelerator.is_main_process:
                     self.ema.update()
@@ -746,9 +750,11 @@ class Trainer(object):
                         avg_psnr = sum(psnr_values) / len(psnr_values)
                         avg_ssim = sum(ssim_values) / len(ssim_values)
                         print(f'Average PSNR: {avg_psnr:.4f}, Average SSIM: {avg_ssim:.4f}')
-                        if wandb.run is not None:
-                            wandb.log({'val_avg_psnr': avg_psnr, 'val_avg_ssim': avg_ssim, 'step': self.step})
-
+                        if self.wandb is not None:
+                            self.wandb.log({
+                                'val_avg_psnr': avg_psnr,
+                                'val_avg_ssim': avg_ssim,
+                            })
                         if self.step == self.save_and_sample_every:
                             os.makedirs(str(self.results_folder / f'imgs'), exist_ok = True)
                             gt_img = torch.cat([gt_first, gt_last, gt_xs], dim=1)
