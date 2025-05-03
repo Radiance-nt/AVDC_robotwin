@@ -150,8 +150,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--training_steps', type=int, default=100)
-    parser.add_argument('-e', '--eval_steps_every', type=int, default=50)
+    parser.add_argument('-s', '--training_steps', type=int, default=1000)
+    parser.add_argument('-e', '--eval_steps_every', type=int, default=250)
     parser.add_argument('-m', '--mode', type=str, default='train', choices=['train', 'inference'])
     parser.add_argument('-c', '--checkpoint_num', type=int, default=None)
     parser.add_argument('-p', '--inference_path', type=str, default=None)
