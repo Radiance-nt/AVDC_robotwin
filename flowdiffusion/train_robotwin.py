@@ -86,8 +86,8 @@ def main(args):
         train_set=train_set,
         valid_set=valid_set,
         train_lr=1e-4,
-        train_num_steps=60000,
-        save_and_sample_every=2500,
+        train_num_steps=60000 + args.training_steps,
+        save_and_sample_every=args.eval_steps_every,
         ema_update_every=10,
         ema_decay=0.999,
         train_batch_size=16,
@@ -143,6 +143,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--training_steps', type=int, default=100)
+    parser.add_argument('-e', '--eval_steps_every', type=int, default=50)
     parser.add_argument('-m', '--mode', type=str, default='train', choices=['train', 'inference'])
     parser.add_argument('-c', '--checkpoint_num', type=int, default=None)
     parser.add_argument('-p', '--inference_path', type=str, default=None)
