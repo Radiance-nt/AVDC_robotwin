@@ -12,6 +12,7 @@ import torch
 import imageio
 from tqdm import tqdm
 import numpy as np
+import wandb
 
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
@@ -176,7 +177,16 @@ if __name__ == "__main__":
     parser.add_argument('-n', '--sample_steps', type=int, default=100)  # set to number of steps to sample
     parser.add_argument('-g', '--guidance_weight', type=int, default=0)  # set to positive to use guidance
     parser.add_argument('-f', '--generate_frames', type=int, default=10)  # set to number of steps to sample
+    parser.add_argument('--use_wandb', action='store_true', help='Enable Weights & Biases logging')
+    parser.add_argument('--run_name', type=str, default=None)  # set to number of steps to sample
     args = parser.parse_args()
+
+    if args.use_wandb:
+        wandb.init(
+            project="robotwin",
+            name=args.run_name,
+        )
+
     if args.mode == 'inference':
         assert args.checkpoint_num is not None
         assert args.sample_steps <= 100
